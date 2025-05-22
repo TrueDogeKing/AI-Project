@@ -163,7 +163,7 @@ if __name__ == '__main__':
     
     # Train the model (set resume=True to continue from checkpoint)
     print("Starting training...")
-    train_losses = train(model, train_loader, criterion, optimizer, epochs=2, resume=False)
+    train_losses = train(model, train_loader, criterion, optimizer, epochs=10, resume=False)
     
     # Plot training loss
     plt.plot(train_losses)

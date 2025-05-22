@@ -43,7 +43,7 @@ transform = transforms.Compose([
     transforms.Normalize((0.1307,), (0.3081,))
 ])
 
-test_dataset = datasets.EMNIST(root='./data', split='byclass', train=False, download=True, transform=transform)
+test_dataset = datasets.EMNIST(root='./data', split='digits', train=False, download=False, transform=transform)
 test_loader = DataLoader(test_dataset, batch_size=16, shuffle=True)
 
 correct = 0
@@ -83,7 +83,7 @@ for i in range(32):
     pred_label = label_to_char(preds[i].item())
     color = 'green' if true_label == pred_label else 'red'
     
-    axes[i].imshow(np.rot90(img), cmap='gray')
+    axes[i].imshow((img), cmap='gray')
     axes[i].set_title(f"T: {true_label} | P: {pred_label}", fontsize=8, color=color)
     axes[i].axis('off')
 
