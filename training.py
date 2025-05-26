@@ -27,18 +27,18 @@ def load_emnist():
     ])
     
     train_dataset = datasets.EMNIST(
-        root='./data',
+        root='./dataset',  
         split='byclass',
         train=True,
-        download=True,
+        download=False,    
         transform=transform
     )
     
     test_dataset = datasets.EMNIST(
-        root='./data',
+        root='./dataset',   
         split='byclass',
         train=False,
-        download=True,
+        download=False,
         transform=transform
     )
     
@@ -129,7 +129,7 @@ def train(model, train_loader, criterion, optimizer, epochs=10, resume=False):
         print(f"Loss: {epoch_loss:.4f}")
 
     
-    # Save final model
+    # Save final model - !! change name for letter only !!
     torch.save(model.state_dict(), 'saved_models/emnist_classifier_final.pth')
     return train_losses
 
@@ -176,6 +176,6 @@ if __name__ == '__main__':
     print("Evaluating model...")
     accuracy = evaluate(model, test_loader)
     
-    # Save final model
+    # Save final model change name here for other model if needed
     torch.save(model.state_dict(), 'saved_models/emnist_classifier_final.pth')
     print("Model saved to saved_models/emnist_classifier_final.pth")
