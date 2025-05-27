@@ -20,27 +20,64 @@ print(f"Using device: {device}")
 os.makedirs('saved_models', exist_ok=True)
 
 ## Data Loading and Preprocessing
-def load_emnist():
+def filter_letters(dataset):
+    # byclass split has 62 classes:
+    # digits 0-9: labels 0-9
+    # uppercase letters: 10-35
+    # lowercase letters: 36-61
+    # So keep only labels in [10..61]
+    letter_labels = list(range(10, 62))
+    
+    # Find indices where label is in letter_labels
+    indices = [i for i, (_, label) in enumerate(dataset) if label in letter_labels]
+
+    # Create a subset with only letters
+    filtered_dataset = Subset(dataset, indices)
+    
+    # Remap labels from [10..61] to [0..51]
+    def remap_labels(idx):
+        img, label = dataset[idx]
+        # Shift label by -10 to get 0-51
+        return img, label - 10
+    
+    # We'll create a wrapper dataset that applies remapping
+    class RemappedDataset(torch.utils.data.Dataset):
+        def __init__(self, subset):
+            self.subset = subset
+        def __len__(self):
+            return len(self.subset)
+        def __getitem__(self, idx):
+            original_idx = self.subset.indices[idx]
+            return remap_labels(original_idx)
+    
+    return RemappedDataset(filtered_dataset)
+
+## Data Loading and Preprocessing (modified)
+def load_emnist_letters_only():
     transform = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize((0.1307,), (0.3081,))
     ])
     
-    train_dataset = datasets.EMNIST(
-        root='./dataset',  
+    full_train_dataset = datasets.EMNIST(
+        root='./dataset',
         split='byclass',
         train=True,
-        download=False,    
+        download=True,
         transform=transform
     )
     
-    test_dataset = datasets.EMNIST(
-        root='./dataset',   
+    full_test_dataset = datasets.EMNIST(
+        root='./dataset',
         split='byclass',
         train=False,
-        download=False,
+        download=True,
         transform=transform
     )
+    
+    # Filter datasets to letters only and remap labels
+    train_dataset = filter_letters(full_train_dataset)
+    test_dataset = filter_letters(full_test_dataset)
     
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
@@ -58,19 +95,17 @@ def load_emnist():
 
 
 
-
-
 ## Define the Neural Network Architecture
-class EMNIST_Classifier(nn.Module):
+class EMNIST_Classifier_LettersOnly(nn.Module):
     def __init__(self):
-        super(EMNIST_Classifier, self).__init__()
+        super(EMNIST_Classifier_LettersOnly, self).__init__()
         self.conv1 = nn.Conv2d(1, 32, kernel_size=3, padding=1)
         self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
         self.pool = nn.MaxPool2d(2, 2)
-        self.dropout1 = nn.Dropout(0.25)  # Changed from Dropout2d
-        self.dropout2 = nn.Dropout(0.5)   # Changed from Dropout2d
+        self.dropout1 = nn.Dropout(0.25)
+        self.dropout2 = nn.Dropout(0.5)
         self.fc1 = nn.Linear(64 * 7 * 7, 128)
-        self.fc2 = nn.Linear(128, 62)
+        self.fc2 = nn.Linear(128, 52)  # 52 outputs for letters only
         
     def forward(self, x):
         x = self.pool(torch.relu(self.conv1(x)))
@@ -130,7 +165,7 @@ def train(model, train_loader, criterion, optimizer, epochs=10, resume=False):
 
     
     # Save final model - !! change name for letter only !!
-    torch.save(model.state_dict(), 'saved_models/emnist_classifier_final.pth')
+    torch.save(model.state_dict(), 'saved_models/emnist_onlyLetters_classifier_final.pth')
     return train_losses
 
 ## Evaluation Function
@@ -153,29 +188,24 @@ def evaluate(model, test_loader):
 
 ## Main Execution
 if __name__ == '__main__':
-    # Load data
-    train_loader, test_loader = load_emnist()
+    # Load filtered data
+    train_loader, test_loader = load_emnist_letters_only()
     
-    # Initialize model, loss, and optimizer
-    model = EMNIST_Classifier().to(device)
+    model = EMNIST_Classifier_LettersOnly().to(device)
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=0.001)
     
-    # Train the model (set resume=True to continue from checkpoint)
-    print("Starting training...")
+    print("Starting training on letters only...")
     train_losses = train(model, train_loader, criterion, optimizer, epochs=10, resume=False)
     
-    # Plot training loss
     plt.plot(train_losses)
-    plt.title('Training Loss')
+    plt.title('Training Loss (Letters Only)')
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
     plt.show()
     
-    # Evaluate the model
-    print("Evaluating model...")
+    print("Evaluating model on letters only...")
     accuracy = evaluate(model, test_loader)
     
-    # Save final model change name here for other model if needed
-    torch.save(model.state_dict(), 'saved_models/emnist_classifier_final.pth')
-    print("Model saved to saved_models/emnist_classifier_final.pth")
+    torch.save(model.state_dict(), 'saved_models/emnist_onlyLetters_classifier_final.pth')
+    print("Model saved to saved_models/emnist_onlyLetters_classifier_final.pth")

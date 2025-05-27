@@ -5,10 +5,11 @@ import torchvision
 import matplotlib.pyplot as plt
 import numpy as np
 from torchvision import datasets, transforms
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset, Dataset
 import string
 import math
-label_map = list(string.digits + string.ascii_uppercase + string.ascii_lowercase)
+import os
+label_map = list(string.ascii_uppercase + string.ascii_lowercase)
 
 # Define device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -23,7 +24,7 @@ class EMNIST_Classifier(nn.Module):
         self.dropout1 = nn.Dropout(0.25)
         self.dropout2 = nn.Dropout(0.5)
         self.fc1 = nn.Linear(64 * 7 * 7, 128)
-        self.fc2 = nn.Linear(128, 62)
+        self.fc2 = nn.Linear(128, 52)
         
     def forward(self, x):
         x = self.pool(torch.relu(self.conv1(x)))
@@ -45,7 +46,7 @@ all_preds = []
 
 
 model = EMNIST_Classifier().to(device)
-model.load_state_dict(torch.load('saved_models/emnist_classifier_final.pth'))
+model.load_state_dict(torch.load('saved_models/emnist_onlyLetters_classifier_final.pth'))
 model.eval()
 
 # Load test dataset
@@ -54,7 +55,33 @@ transform = transforms.Compose([
     transforms.Normalize((0.1307,), (0.3081,))
 ])
 
-test_dataset = datasets.EMNIST(root='./data', split='byclass', train=False, download=False, transform=transform)
+
+letter_indices = list(range(10, 62))
+original_to_letter_idx = {orig: i for i, orig in enumerate(letter_indices)}
+letter_indices_set = set(letter_indices)
+
+# Download and filter dataset
+emnist_test = datasets.EMNIST(root='./dataset', split='byclass', train=False, download=True, transform=transform)
+letter_only_indices = [i for i, (_, label) in enumerate(emnist_test) if label in letter_indices_set]
+letter_test_dataset = Subset(emnist_test, letter_only_indices)
+
+# Remap labels to 0–51
+class LetterOnlyDataset(Dataset):
+    def __init__(self, subset, transform=None):
+        self.subset = subset
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.subset)
+
+    def __getitem__(self, idx):
+        image, label = self.subset[idx]
+        label = original_to_letter_idx[label]
+        if self.transform:
+            image = self.transform(image)
+        return image, label
+
+test_dataset = LetterOnlyDataset(letter_test_dataset, transform=None)
 test_loader = DataLoader(test_dataset, batch_size=16, shuffle=True)
 
 correct = 0
