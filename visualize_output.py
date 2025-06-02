@@ -21,22 +21,35 @@ class EMNIST_Classifier(nn.Module):
     def __init__(self):
         super(EMNIST_Classifier, self).__init__()
         self.conv1 = nn.Conv2d(1, 32, kernel_size=3, padding=1)
+        self.bn1 = nn.BatchNorm2d(32)
+
         self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
+        self.bn2 = nn.BatchNorm2d(64)
+
+        self.conv3 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
+        self.bn3 = nn.BatchNorm2d(128)
+
         self.pool = nn.MaxPool2d(2, 2)
-        self.dropout1 = nn.Dropout(0.25)
+        self.act = nn.LeakyReLU(0.1)
+
+        self.dropout1 = nn.Dropout(0.3)
         self.dropout2 = nn.Dropout(0.5)
-        self.fc1 = nn.Linear(64 * 7 * 7, 128)
-        self.fc2 = nn.Linear(128, 52)
-        
+
+        self.fc1 = nn.Linear(128 * 3 * 3, 256)
+        self.fc2 = nn.Linear(256, 128)
+        self.fc3 = nn.Linear(128, 52)
+
     def forward(self, x):
-        x = self.pool(torch.relu(self.conv1(x)))
-        x = self.pool(torch.relu(self.conv2(x)))
+        x = self.pool(self.act(self.bn1(self.conv1(x))))  # 28x28 → 14x14
+        x = self.pool(self.act(self.bn2(self.conv2(x))))  # 14x14 → 7x7
+        x = self.pool(self.act(self.bn3(self.conv3(x))))  # 7x7 → 3x3
         x = self.dropout1(x)
-        x = x.view(-1, 64 * 7 * 7)
-        x = torch.relu(self.fc1(x))
-        x = self.dropout2(x)
-        x = self.fc2(x)
+        x = x.view(-1, 128 * 3 * 3)
+        x = self.dropout2(self.act(self.fc1(x)))
+        x = self.act(self.fc2(x))
+        x = self.fc3(x)
         return x
+
 
 def label_to_char(index):
     return label_map[index]  # index is from 1–26, so subtract 1
@@ -48,7 +61,7 @@ all_preds = []
 
 
 model = EMNIST_Classifier().to(device)
-model.load_state_dict(torch.load('saved_models/emnist_onlyLetters_classifier_final.pth', map_location=device))
+model.load_state_dict(torch.load('saved_models/emnist_letters_improved.pth', map_location=device))
 model.eval()
 
 # Load test dataset
