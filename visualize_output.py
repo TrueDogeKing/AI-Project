@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader, Subset, Dataset
+from PIL import Image, ImageOps
+from torchvision.datasets import ImageFolder
 import string
 import math
 import os
@@ -46,7 +48,7 @@ all_preds = []
 
 
 model = EMNIST_Classifier().to(device)
-model.load_state_dict(torch.load('saved_models/emnist_onlyLetters_classifier_final.pth'))
+model.load_state_dict(torch.load('saved_models/emnist_onlyLetters_classifier_final.pth', map_location=device))
 model.eval()
 
 # Load test dataset
@@ -164,3 +166,74 @@ all_labels = np.concatenate(all_labels, axis=0)
 all_preds = np.concatenate(all_preds, axis=0)
 
 show_all_batches(all_images, all_labels, all_preds, batch_size=32)
+
+
+
+custom_root = "my_dataset"
+
+# Fix RotateAndMirror
+class RotateAndMirror:
+    def __call__(self, img):
+        # img jest PIL Image
+        img = np.array(img)          # Konwersja do numpy
+        img = np.rot90(img, k=-1)   # Obrót o 90° w prawo
+        img = img[:, ::-1]           # Odbicie lustrzane w poziomie
+        img = img.astype(np.uint8)
+        img = Image.fromarray(img)
+        img = ImageOps.invert(img)
+        return img
+
+# Fix transform for custom data
+custom_transform = transforms.Compose([
+    RotateAndMirror(),
+    transforms.Grayscale(num_output_channels=1),
+    transforms.Resize((28, 28)),
+    transforms.ToTensor(),
+    transforms.Normalize((0.1307,), (0.3081,))
+])
+
+# Reload the dataset with the updated transform
+custom_dataset = ImageFolder(
+    root=custom_root,
+    transform=custom_transform
+)
+
+# Run inference with corrected tensors
+custom_loader = DataLoader(custom_dataset, batch_size=32, shuffle=True)
+custom_all_images = []
+custom_all_labels = []
+custom_all_preds = []
+images, labels = next(iter(custom_loader))
+images, labels = images.to(device), labels.to(device)
+total = 0
+correct = 0
+with torch.no_grad():
+    for images, labels in custom_loader:
+        images = images.to(device)
+        outputs = model(images)
+        _, preds = torch.max(outputs, 1)
+        total += labels.size(0)
+
+        custom_all_images.append(images.cpu().numpy())
+        custom_all_labels.append(labels.cpu().numpy())
+        custom_all_preds.append(preds.cpu().numpy())
+
+        for i in range(len(labels)):
+            true_label = label_to_char(labels[i].item())
+            pred_label = label_to_char(preds[i].item())
+            correct_case_insensitive = true_label.lower() == pred_label.lower()
+
+            if correct_case_insensitive:
+                correct += 1
+
+    accuracy = 100 * correct / total
+    print(f'Test Accuracy: {accuracy:.2f}%')
+
+custom_all_images = np.concatenate(custom_all_images, axis=0)
+custom_all_labels = np.concatenate(custom_all_labels, axis=0)
+custom_all_preds = np.concatenate(custom_all_preds, axis=0)
+
+def label_to_char(index):
+    return label_map[index]
+
+show_all_batches(custom_all_images, custom_all_labels, custom_all_preds, batch_size=32)
