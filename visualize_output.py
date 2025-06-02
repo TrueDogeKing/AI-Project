@@ -178,7 +178,7 @@ all_images = np.concatenate(all_images, axis=0)
 all_labels = np.concatenate(all_labels, axis=0)
 all_preds = np.concatenate(all_preds, axis=0)
 
-show_all_batches(all_images, all_labels, all_preds, batch_size=32)
+#show_all_batches(all_images, all_labels, all_preds, batch_size=32)
 
 
 
