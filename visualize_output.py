@@ -173,16 +173,15 @@ predicted_wrong_summary = defaultdict(lambda: [0, 0])
 for img, true, pred in zip(custom_all_images, custom_all_labels, custom_all_preds):
     pred_char = label_to_char(pred)
     true_char = label_to_char(true)
-    predicted_wrong_summary[pred_char][0] += 1
-    if pred_char != true_char:
+    if pred_char.lower() != true_char.lower():
+        predicted_wrong_summary[pred_char][0] += 1
         predicted_wrong_summary[pred_char][1] += 1
         predicted_wrong_images[pred_char].append((img.squeeze(), true_char))
 
-print("\nPrediction Summary (model predictions and incorrect cases — Case-Sensitive):\n")
+print("\nPrediction Summary (model predictions and incorrect cases — Case-Insensitive Only):\n")
 sorted_summary = sorted(predicted_wrong_summary.items(), key=lambda x: x[1][1], reverse=True)
 for pred_char, (total, wrong) in sorted_summary:
-    if wrong > 0:
-        print(f"Predicted '{pred_char}' {total} times — {wrong} were incorrect")
+    print(f"Predicted '{pred_char}' {total} times — {wrong} were incorrect")
 
 def show_wrong_predictions(predicted_wrong_images, max_per_pred=12):
     for pred_char, entries in predicted_wrong_images.items():
